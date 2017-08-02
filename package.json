@@ -1,0 +1,24 @@
+{
+  "name": "epp",
+  "version": "1.0.0",
+  "description": "Edu plan parser",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ITOO-UrFU/EPP.git"
+  },
+  "author": "mastergowen@gmail.com, vesloguzov@gmail.com",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ITOO-UrFU/EPP/issues"
+  },
+  "homepage": "https://github.com/ITOO-UrFU/EPP#readme",
+  "dependencies": {
+    "cheerio": "^1.0.0-rc.2",
+    "cheerio-tableparser": "^1.0.1"
+  }
+}
