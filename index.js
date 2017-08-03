@@ -1,4 +1,3 @@
-console.time('parse');
 var http = require('http');
 var fs = require('fs');
 var path = require('path');
@@ -12,34 +11,59 @@ const tableToCsv = require('node-table-to-csv');
 
 const dataDir = "./data";
 const resultDir = "./result";
+const doneDir = "./done";
+const dumpDir = "./dump";
 let filesArr = [];
 let data = [];
+let isWaiting = true;
 
 alasql('CREATE DATABASE db');
 alasql('USE db');
-fs.readdir(dataDir, (err, files) => {
-    files.forEach(file => {
-        filesArr.push(file);
-        data.push(parse(file));
-    });
-    console.timeEnd('parse');
-})
 
-http.createServer(function(req, res) {
-    var html = buildHtml(req);
+function Main() {
+    this.Enabled = true;
+    this.Loop = function() {
+        if (this.Enabled == true) {
+            worker();
+            setTimeout(this.Loop.bind(this), 1000);
+        }
+    };
+    this.Stop = function() {
+        this.Enabled = false;
+    };
 
-    res.writeHead(200, {
-        'Content-Type': 'text/html'
-    });
-    res.end(html);
-}).listen(8080);
+    function worker() {
+        if (fs.existsSync(resultDir) == false) {
+            fs.mkdir(resultDir);
+        };
+        if (fs.existsSync(dumpDir) == false) {
+            fs.mkdir(dumpDir);
+        };
+        if (fs.existsSync(doneDir) == false) {
+            fs.mkdir(doneDir);
+        };
+        if (fs.existsSync(dataDir)) {
+            fs.readdir(dataDir, (err, files) => {
+                if (files != undefined) {
+                    isWaiting = false;
+                    files.forEach(file => {
+                        console.log(file);
+                        filesArr.push(file);
+                        data.push(parse(file));
+                    });
+                }
+            })
+        } else {
+            fs.mkdir(dataDir);
+        }
+        return isWaiting
+    }
+}
 
-function buildHtml(req) {
-    var header = '<meta charset="utf-8"/>';
-    var body = filesArr.join("<br />") + "<br/><br/><b>DATA:</b><br/>" + data.join("<br />");
-    return '<!DOCTYPE html>' +
-        '<html><head>' + header + '</head><body>' + body + '</body></html>';
-};
+var w = new Main();
+setTimeout(w.Loop.bind(w), 1000);
+// setTimeout(w.Stop.bind(w), 3000);
+
 
 function parse(file) {
     let disciplines = [];
@@ -47,10 +71,15 @@ function parse(file) {
     let headers = [];
     let term = 0;
     let tableName = "eduPlan" + crypto.createHash('md5').update(slug(file)).digest('hex').substring(0, 7);
-    alasql('CREATE TABLE ' + tableName);
+
+    //Чекаем, ести ли такая таблица в списке таблиц
+    let tables = alasql("SHOW TABLES FROM db")
+    if (tables.find(o => o.tableid === tableName) == undefined) {
+        //Создаем, если нет
+        alasql('CREATE TABLE ' + tableName);
+    }
 
     var $ = cheerio.load(fs.readFileSync(path.join(dataDir, file), 'utf8'));
-    var document = buildHtml($.html());
     var tableParser = cheerioTableparser($);
     var csv = transMatrix($("#EduVersionPlanTab\\.EduDisciplineList").parsetable(true, true, true));
 
@@ -79,21 +108,24 @@ function parse(file) {
     }
 
     let response = {
-        "source": file,
-        "term": term,
-        "version": getText($, "EduVersionPlanTab.EduVersionPlan.displayableTitle").trim(),
-        "number": getText($, "EduVersionPlanTab.EduVersionPlan.number").trim(),
-        "title": getText($, "EduVersionPlanTab.EduVersionPlan.title").trim(),
-        "stage": getText($, "EduVersionPlanTab.EduVersionPlan.stage").trim(),
-        "modules": alasql('SELECT ' +
-            'indexheaderCell, titleheaderCell, disciplineNumberheaderCell, gosLoadInTestUnitsheaderCell ' +
-            'FROM ' + tableName + ' WHERE disciplineNumberheaderCell != "______" AND disciplineNumberheaderCell != "" AND disciplineNumberheaderCell > 1000 AND indexheaderCell LIKE "М.%"'),
+            "source": file,
+            "term": term,
+            "version": getText($, "EduVersionPlanTab.EduVersionPlan.displayableTitle").trim(),
+            "number": getText($, "EduVersionPlanTab.EduVersionPlan.number").trim(),
+            "title": getText($, "EduVersionPlanTab.EduVersionPlan.title").trim(),
+            "stage": getText($, "EduVersionPlanTab.EduVersionPlan.stage").trim(),
+            "modules": alasql('SELECT ' +
+                'indexheaderCell, titleheaderCell, disciplineNumberheaderCell, gosLoadInTestUnitsheaderCell ' +
+                'FROM ' + tableName + ' WHERE disciplineNumberheaderCell != "______" AND disciplineNumberheaderCell != "" AND disciplineNumberheaderCell > 1000 AND indexheaderCell LIKE "М.%"'),
 
-        "disciplines": alasql('SELECT ' +
-            'indexheaderCell, titleheaderCell, disciplineNumberheaderCell, gosLoadInTestUnitsheaderCell,  term1headerCell, term2headerCell, term3headerCell, ' +
-            'term4headerCell, term5headerCell, term6headerCell, term7headerCell, term8headerCell, term9headerCell, term10headerCell ' +
-            'FROM ' + tableName + ' WHERE indexheaderCell != "" AND indexheaderCell REGEXP("^d*") AND disciplineNumberheaderCell != "______" AND disciplineNumberheaderCell != "" AND disciplineNumberheaderCell > 1000'),
-    }
+            "disciplines": alasql('SELECT ' +
+                'indexheaderCell, titleheaderCell, disciplineNumberheaderCell, gosLoadInTestUnitsheaderCell,  term1headerCell, term2headerCell, term3headerCell, ' +
+                'term4headerCell, term5headerCell, term6headerCell, term7headerCell, term8headerCell, term9headerCell, term10headerCell ' +
+                'FROM ' + tableName + ' WHERE indexheaderCell != "" AND indexheaderCell REGEXP("^d*") AND allloadheaderCell > 0'),
+        }
+        //Хуй знает, как в план попадают дисциплины, и что они имели ввиду
+        //AND disciplineNumberheaderCell != "______" AND disciplineNumberheaderCell != "" AND disciplineNumberheaderCell > 1000
+
 
     for (module in response.modules) {
         var moduleIndex = response.modules[module].indexheaderCell.replace("М.", "") + "."
@@ -103,31 +135,45 @@ function parse(file) {
         response.modules[module]["disciplines"] = disciplines;
     }
 
-
     delete response.disciplines;
-    console.log(response.modules)
 
+    //На всякий случай дампаем базу в файл
+    var tableIds = tables.map(function(tableObj) {
+        return tableObj["tableid"];
+    });
+    for (let i = 0; i < tableIds.length; i++) {
+        var sqlDump = alasql('SELECT * INTO JSON(?) FROM ' + tableIds[i], [path.join(dumpDir, tableIds[i] + ".sql")]);
+    }
+
+    //Пишем рабочий json, который потом отправим на сервер
     fs.writeFile(path.join(resultDir, tableName + ".json"), JSON.stringify(response), function(err) {
         if (err) {
             return console.log(err);
         }
         console.log(tableName + ".json was saved!");
     });
+    //Перемещаем html файл в папку с отработанными файлами, пусть лежит там пока
+    fs.renameSync(path.join(dataDir, file), path.join(doneDir, file));
     return JSON.stringify(response)
 }
 
 
 function getText($, id) {
+    //Принимает основную функцию Чирио и id элемента
+    //Возвращает текст без переносов строк
     var id = id.replace(/\./gm, "\\.")
     return $("#" + id).text().replace(/(\r\n|\n|\r|\t)/gm, "")
 }
 
 function getHTML($, id) {
+    //Принимает основную функцию Чирио и id элемента
+    //Возвращает html без переносов строк
     var id = id.replace(/\./gm, "\\.")
     return $("#" + id).html().replace(/(\r\n|\n|\r|\t)/gm, "")
 }
 
 function transMatrix(A) {
+    //Транспонирует матрицу
     var m = A.length,
         n = A[0].length,
         AT = [];

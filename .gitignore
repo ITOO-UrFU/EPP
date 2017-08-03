@@ -56,5 +56,9 @@ typings/
 
 # dotenv environment variables file
 .env
+
+# custom data dirs
 data/*
 result/*
+done/*
+dump/*
