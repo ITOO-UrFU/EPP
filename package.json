@@ -18,7 +18,10 @@
   },
   "homepage": "https://github.com/ITOO-UrFU/EPP#readme",
   "dependencies": {
+    "alasql": "^0.4.1",
     "cheerio": "^1.0.0-rc.2",
-    "cheerio-tableparser": "^1.0.1"
+    "cheerio-tableparser": "^1.0.1",
+    "node-table-to-csv": "^0.1.0",
+    "slug": "^0.9.1"
   }
 }
