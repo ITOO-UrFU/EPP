@@ -12,9 +12,11 @@ const dataDir = "./data";
 const resultDir = "./result";
 const doneDir = "./done";
 const dumpDir = "./dump";
+
+const romanDigits = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "XIV", "XV"];
 let filesArr = [];
 let data = [];
-let isWaiting = true;
+const doneFiles = false; //Убирать обработанные файлы?
 
 alasql('CREATE DATABASE db');
 alasql('USE db');
@@ -54,7 +56,6 @@ function Main() {
         } else {
             fs.mkdir(dataDir);
         }
-        return isWaiting
     }
 }
 
@@ -122,13 +123,59 @@ function parse(file) {
             //Хуй знает, как в план попадают дисциплины, и что они имели ввиду
             //AND disciplineNumberheaderCell != "______" AND disciplineNumberheaderCell != "" AND disciplineNumberheaderCell > 1000
 
+        //Пытаемся разбить дисциплины на части.
+        // Примем за правило, что если трудоёмкость больше 7 з.е. и дисциплина изучается несколько семестров,
+        // то каждый семестр изучения - это новая дисциплина
+
+        // Сперва найдём "большие" дисциплины, которые надо разделить
+
+        for (i in response.disciplines) {
+            let discipline = response.disciplines[i];
+            let keys = Object.keys(discipline).filter(function(key) {
+                return key.indexOf("__term") !== -1
+            })
+            let semesters = [];
+            for (let k = 0; k < keys.length; k++) {
+                if (parseInt(discipline[keys[k]]) > 0) {
+                    if (parseInt(discipline[keys[k]]) > 0) {
+                        semesters.push(keys[k].replace(/[^\d.]/g, ''));
+                    }
+                }
+            }
+            //В следующей строке костыль. Почему-то модули попадают в список дисциплин, 
+            // но отсеиваются далее, если дисциплины не "большие"
+
+            if (discipline.allloadheaderCell > 36 * 7 && semesters.length > 2 && discipline.indexheaderCell.indexOf("М.") == -1) {
+                for (var s = 0; s < semesters.length; s++) {
+                    // Трудоёмкость новой дисциплины
+                    let load = parseInt(discipline["__term" + semesters[s] + "headerCell"])
+                    semesterHeaderCell = "__term" + (s + 1) + "headerCell";
+
+                    // Затем наклонируем их с убиранием ненужных семестров и срезанием нагрузки
+                    console.log(romanDigits[s])
+                    response.disciplines.push({
+                        "titleheaderCell": discipline.titleheaderCell + " " + romanDigits[s],
+                        "indexheaderCell": discipline.indexheaderCell + "." + s,
+                        "orderheaderCell": discipline.orderheaderCell,
+                        "gosLoadInTestUnitsheaderCell": load,
+                        "allloadheaderCell": load * 36,
+                        [semesterHeaderCell]: load
+
+                    })
+                }
+            }
+            //Удаляем толстую дисциплину из респонса
+            //response.disciplines.splice(i, 1); Пока не удаляем, какая-то хрень с логикой
+        }
+
+        //Раскладываем дисциплины по модулям
 
         for (module in response.modules) {
             var moduleIndex = response.modules[module].indexheaderCell.replace("М.", "") + "."
             disciplines = response.disciplines.filter(function(item) {
                 return item.indexheaderCell.indexOf(moduleIndex) !== -1
             });
-            //Ищем первый семести дисциплины
+            //Ищем первый семестр дисциплины
             for (let i = 0; i < disciplines.length; i++) {
                 keys = Object.keys(disciplines[i]).filter(function(key) {
                     return key.indexOf("__term") !== -1
@@ -164,7 +211,9 @@ function parse(file) {
             console.log(tableName + ".json was saved!");
         });
         //Перемещаем html файл в папку с отработанными файлами, пусть лежит там пока
-        fs.renameSync(path.join(dataDir, file), path.join(doneDir, file));
+        if (doneFiles) {
+            fs.renameSync(path.join(dataDir, file), path.join(doneDir, file));
+        }
         return JSON.stringify(response)
     } catch (e) {
 
