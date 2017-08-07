@@ -16,7 +16,7 @@ const dumpDir = "./dump";
 const romanDigits = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "XIV", "XV"];
 let filesArr = [];
 let data = [];
-const doneFiles = false; //Убирать обработанные файлы?
+const doneFiles = true; //Убирать обработанные файлы?
 
 alasql('CREATE DATABASE db');
 alasql('USE db');
@@ -108,65 +108,25 @@ function parse(file) {
         }
 
         let response = {
-                "source": file,
-                "term": term,
-                "version": getText($, "EduVersionPlanTab.EduVersionPlan.displayableTitle").trim(),
-                "number": getText($, "EduVersionPlanTab.EduVersionPlan.number").trim(),
-                "title": getText($, "EduVersionPlanTab.EduVersionPlan.title").trim(),
-                "stage": getText($, "EduVersionPlanTab.EduVersionPlan.stage").trim(),
-                "modules": alasql('SELECT * FROM ' + tableName +
-                    ' WHERE disciplineNumberheaderCell != "______" AND disciplineNumberheaderCell != "" AND disciplineNumberheaderCell > 1000 AND indexheaderCell LIKE "М.%"'),
+            "source": file,
+            "term": term,
+            "version": getText($, "EduVersionPlanTab.EduVersionPlan.displayableTitle").trim(),
+            "number": getText($, "EduVersionPlanTab.EduVersionPlan.number").trim(),
+            "title": getText($, "EduVersionPlanTab.EduVersionPlan.title").trim(),
+            "stage": getText($, "EduVersionPlanTab.EduVersionPlan.stage").trim(),
+            "modules": alasql('SELECT * FROM ' + tableName +
+                ' WHERE disciplineNumberheaderCell != "______" AND disciplineNumberheaderCell != "" AND disciplineNumberheaderCell > 1000 AND indexheaderCell LIKE "М.%"'),
 
-                "disciplines": alasql('SELECT * FROM ' + tableName +
-                    ' WHERE indexheaderCell != "" AND indexheaderCell REGEXP("^d*") AND allloadheaderCell > 0'),
-            }
-            //Хуй знает, как в план попадают дисциплины, и что они имели ввиду
-            //AND disciplineNumberheaderCell != "______" AND disciplineNumberheaderCell != "" AND disciplineNumberheaderCell > 1000
-
-        //Пытаемся разбить дисциплины на части.
-        // Примем за правило, что если трудоёмкость больше 7 з.е. и дисциплина изучается несколько семестров,
-        // то каждый семестр изучения - это новая дисциплина
-
-        // Сперва найдём "большие" дисциплины, которые надо разделить
-
-        for (i in response.disciplines) {
-            let discipline = response.disciplines[i];
-            let keys = Object.keys(discipline).filter(function(key) {
-                return key.indexOf("__term") !== -1
-            })
-            let semesters = [];
-            for (let k = 0; k < keys.length; k++) {
-                if (parseInt(discipline[keys[k]]) > 0) {
-                    if (parseInt(discipline[keys[k]]) > 0) {
-                        semesters.push(keys[k].replace(/[^\d.]/g, ''));
-                    }
-                }
-            }
-            //В следующей строке костыль. Почему-то модули попадают в список дисциплин, 
-            // но отсеиваются далее, если дисциплины не "большие"
-
-            if (discipline.allloadheaderCell > 36 * 7 && semesters.length > 2 && discipline.indexheaderCell.indexOf("М.") == -1) {
-                for (var s = 0; s < semesters.length; s++) {
-                    // Трудоёмкость новой дисциплины
-                    let load = parseInt(discipline["__term" + semesters[s] + "headerCell"])
-                    semesterHeaderCell = "__term" + (s + 1) + "headerCell";
-
-                    // Затем наклонируем их с убиранием ненужных семестров и срезанием нагрузки
-                    console.log(romanDigits[s])
-                    response.disciplines.push({
-                        "titleheaderCell": discipline.titleheaderCell + " " + romanDigits[s],
-                        "indexheaderCell": discipline.indexheaderCell + "." + s,
-                        "orderheaderCell": discipline.orderheaderCell,
-                        "gosLoadInTestUnitsheaderCell": load,
-                        "allloadheaderCell": load * 36,
-                        [semesterHeaderCell]: load
-
-                    })
-                }
-            }
-            //Удаляем толстую дисциплину из респонса
-            //response.disciplines.splice(i, 1); Пока не удаляем, какая-то хрень с логикой
+            "disciplines": alasql('SELECT * FROM ' + tableName +
+                ' WHERE indexheaderCell != "" AND indexheaderCell REGEXP("^d*") AND allloadheaderCell > 0'),
         }
+
+        //Теперь пытаемся засунуть семестры экзамена/зачета в дисциплины
+        console.log($('[title="Экзамен"]').attr('id').split(".").slice(-1)[0]);
+        console.log($('[title="Зачет"]').attr('id').split(".").slice(-1)[0]);
+        //Хуй знает, как в план попадают дисциплины, и что они имели ввиду
+        //AND disciplineNumberheaderCell != "______" AND disciplineNumberheaderCell != "" AND disciplineNumberheaderCell > 1000
+
 
         //Раскладываем дисциплины по модулям
 
@@ -175,6 +135,52 @@ function parse(file) {
             disciplines = response.disciplines.filter(function(item) {
                 return item.indexheaderCell.indexOf(moduleIndex) !== -1
             });
+
+            //Пытаемся разбить дисциплины на части.
+            // Примем за правило, что если дисциплина изучается несколько семестров,
+            // то каждый семестр изучения - это новая дисциплина
+
+            // Сперва найдём "большие" дисциплины, которые надо разделить
+
+            for (i in disciplines) {
+                let discipline = disciplines[i];
+                let keys = Object.keys(discipline).filter(function(key) {
+                    return key.indexOf("__term") !== -1
+                })
+                let semesters = [];
+                for (let k = 0; k < keys.length; k++) {
+                    if (parseInt(discipline[keys[k]]) > 0) {
+                        if (parseInt(discipline[keys[k]]) > 0) {
+                            semesters.push(keys[k].replace(/[^\d.]/g, ''));
+                        }
+                    }
+                }
+                //В следующей строке костыль. Почему-то модули попадают в список дисциплин, 
+                // но отсеиваются далее, если дисциплины не "большие"
+
+
+                if (semesters.length > 2 && discipline.indexheaderCell.indexOf("М.") == -1 &&
+                    response.modules[module].titleheaderCell.toLowerCase().indexOf("практик") === -1) { // Большая дисциплина
+                    for (var s = 0; s < semesters.length; s++) {
+                        // Трудоёмкость новой дисциплины
+                        let load = parseInt(discipline["__term" + semesters[s] + "headerCell"])
+                        semesterHeaderCell = "__term" + semesters[s] + "headerCell";
+
+                        // Затем наклонируем их с убиранием ненужных семестров и срезанием нагрузки
+                        disciplines.push({
+                            "titleheaderCell": discipline.titleheaderCell + " " + romanDigits[s],
+                            "indexheaderCell": discipline.indexheaderCell + "." + semesters[s],
+                            "orderheaderCell": discipline.orderheaderCell,
+                            "gosLoadInTestUnitsheaderCell": load,
+                            "allloadheaderCell": load * 36,
+                            [semesterHeaderCell]: load
+
+                        })
+                    }
+                }
+                //Удаляем толстую дисциплину из респонса
+                //response.disciplines.splice(i, 1); Пока не удаляем, какая-то хрень с логикой
+            }
             //Ищем первый семестр дисциплины
             for (let i = 0; i < disciplines.length; i++) {
                 keys = Object.keys(disciplines[i]).filter(function(key) {
