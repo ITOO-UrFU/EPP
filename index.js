@@ -12,6 +12,7 @@ const dataDir = "./data";
 const resultDir = "./result";
 const doneDir = "./done";
 const dumpDir = "./dump";
+const uniData = "./uni_data";
 
 const romanDigits = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "XIV", "XV"];
 let filesArr = [];
@@ -147,6 +148,7 @@ function parse(file) {
 
                 //Ищем экзамены и парсим
                 let exam = discipline[exam_id]
+                if (exam == undefined) { exam = "" }; // маленький костыль
                 if (exam.indexOf("-") !== -1) {
                     exam = range(parseInt(exam.split("-")[0]), parseInt(exam.split("-")[1]))
                 } else if (exam == "") {
@@ -157,6 +159,7 @@ function parse(file) {
 
                 //Ищем зачеты и парсим
                 let credit = discipline[credit_id]
+                if (credit == undefined) { credit = "" }; // маленький костыль
                 if (credit.indexOf("-") !== -1) {
                     credit = range(parseInt(credit.split("-")[0]), parseInt(credit.split("-")[1]))
 
@@ -242,19 +245,15 @@ function parse(file) {
         }
 
         //Пишем рабочий json, который потом отправим на сервер
-        fs.writeFile(path.join(resultDir, tableName + ".json"), JSON.stringify(response), function(err) {
-            if (err) {
-                return console.log(err);
-            }
-            console.log(tableName + ".json was saved!");
-        });
+        fs.writeFileSync(path.join(resultDir, tableName + ".json"), JSON.stringify(response));
+        console.log(tableName + ".json was saved!");
         //Перемещаем html файл в папку с отработанными файлами, пусть лежит там пока
         if (doneFiles) {
             fs.renameSync(path.join(dataDir, file), path.join(doneDir, file));
         }
         return JSON.stringify(response)
     } catch (e) {
-
+        console.log(e);
     }
 }
 
