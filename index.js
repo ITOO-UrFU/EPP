@@ -60,7 +60,7 @@ function Main() {
 }
 
 var w = new Main();
-setTimeout(w.Loop.bind(w), 7000);
+setTimeout(w.Loop.bind(w), 10);
 // setTimeout(w.Stop.bind(w), 3000);
 
 
@@ -122,8 +122,8 @@ function parse(file) {
         }
 
         //Теперь пытаемся засунуть семестры экзамена/зачета в дисциплины
-        console.log($('[title="Экзамен"]').attr('id').split(".").slice(-1)[0]);
-        console.log($('[title="Зачет"]').attr('id').split(".").slice(-1)[0]);
+        const exam_id = $('[title="Экзамен"]').attr('id').split(".").slice(-1)[0];
+        const credit_id = $('[title="Зачет"]').attr('id').split(".").slice(-1)[0];
         //Хуй знает, как в план попадают дисциплины, и что они имели ввиду
         //AND disciplineNumberheaderCell != "______" AND disciplineNumberheaderCell != "" AND disciplineNumberheaderCell > 1000
 
@@ -144,6 +144,29 @@ function parse(file) {
 
             for (i in disciplines) {
                 let discipline = disciplines[i];
+
+                //Ищем экзамены и парсим
+                let exam = discipline[exam_id]
+                if (exam.indexOf("-") !== -1) {
+                    exam = range(parseInt(exam.split("-")[0]), parseInt(exam.split("-")[1]))
+                } else if (exam == "") {
+                    exam = [0]
+                } else {
+                    exam = [parseInt(exam)]
+                }
+
+                //Ищем зачеты и парсим
+                let credit = discipline[credit_id]
+                if (credit.indexOf("-") !== -1) {
+                    credit = range(parseInt(credit.split("-")[0]), parseInt(credit.split("-")[1]))
+
+                } else if (credit == "") {
+                    credit = [0]
+
+                } else {
+                    credit = [parseInt(credit)]
+                }
+
                 let keys = Object.keys(discipline).filter(function(key) {
                     return key.indexOf("__term") !== -1
                 })
@@ -155,16 +178,22 @@ function parse(file) {
                         }
                     }
                 }
-                //В следующей строке костыль. Почему-то модули попадают в список дисциплин, 
-                // но отсеиваются далее, если дисциплины не "большие"
-
-
                 if (semesters.length > 2 && discipline.indexheaderCell.indexOf("М.") == -1 &&
                     response.modules[module].titleheaderCell.toLowerCase().indexOf("практик") === -1) { // Большая дисциплина
                     for (var s = 0; s < semesters.length; s++) {
+                        var currentCredit = 0;
+                        var currentExam = 0;
                         // Трудоёмкость новой дисциплины
-                        let load = parseInt(discipline["__term" + semesters[s] + "headerCell"])
+                        let load = parseInt(discipline["__term" + semesters[s] + "headerCell"]);
                         semesterHeaderCell = "__term" + semesters[s] + "headerCell";
+
+                        if (credit.indexOf(parseInt(semesters[s])) >= 0) {
+                            currentCredit = parseInt(semesters[s])
+                        }
+
+                        if (exam.indexOf(parseInt(semesters[s])) >= 0) {
+                            currentExam = parseInt(semesters[s])
+                        }
 
                         // Затем наклонируем их с убиранием ненужных семестров и срезанием нагрузки
                         disciplines.push({
@@ -173,13 +202,16 @@ function parse(file) {
                             "orderheaderCell": discipline.orderheaderCell,
                             "gosLoadInTestUnitsheaderCell": load,
                             "allloadheaderCell": load * 36,
+                            "disciplineNumberheaderCell": discipline.disciplineNumberheaderCell,
+                            "exam": currentExam,
+                            "credit": currentCredit,
                             [semesterHeaderCell]: load
 
                         })
                     }
                 }
                 //Удаляем толстую дисциплину из респонса
-                //response.disciplines.splice(i, 1); Пока не удаляем, какая-то хрень с логикой
+                disciplines.splice(i, 1)
             }
             //Ищем первый семестр дисциплины
             for (let i = 0; i < disciplines.length; i++) {
@@ -252,3 +284,23 @@ function transMatrix(A) {
     }
     return AT;
 }
+
+function range(start, stop, step) {
+    //Имплементация питонячьего range
+    if (typeof stop == 'undefined') {
+        // one param defined
+        stop = start;
+        start = 0;
+    }
+    if (typeof step == 'undefined') {
+        step = 1;
+    }
+    if ((step > 0 && start >= stop) || (step < 0 && start <= stop)) {
+        return [];
+    }
+    var result = [];
+    for (var i = start; step > 0 ? i <= stop : i > stop; i += step) {
+        result.push(i);
+    }
+    return result;
+};
