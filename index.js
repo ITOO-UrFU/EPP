@@ -181,7 +181,7 @@ function parse(file) {
                         }
                     }
                 }
-                if (semesters.length > 2 && discipline.indexheaderCell.indexOf("М.") == -1 &&
+                if (semesters.length > 1 && discipline.indexheaderCell.indexOf("М.") == -1 &&
                     response.modules[module].titleheaderCell.toLowerCase().indexOf("практик") === -1) { // Большая дисциплина
                     for (var s = 0; s < semesters.length; s++) {
                         var currentCredit = 0;
@@ -212,9 +212,9 @@ function parse(file) {
 
                         })
                     }
+                    //Удаляем толстую дисциплину из респонса
+                    disciplines.splice(i, 1)
                 }
-                //Удаляем толстую дисциплину из респонса
-                disciplines.splice(i, 1)
             }
             //Ищем первый семестр дисциплины
             for (let i = 0; i < disciplines.length; i++) {
@@ -234,10 +234,10 @@ function parse(file) {
             response.modules[module]["disciplines"] = disciplines;
 
             //Ого, всё сложили в респонс. Можно из юни подтянуть их модули и добавить поля к нашим
-            let uniModule = uniModules.find(function(element, num) {
+            let uniModule = uniModules.find(function(element) {
                     return element.number == parseInt(response.modules[module].disciplineNumberheaderCell);
                 }) // response.modules[module].disciplineNumberheaderCell);
-            if (uniModule != undefined) {
+            if (uniModule != undefined) { // Надо как-то иначе объекты сливать, куча одинаковых строк - плохо
                 response.modules[module].uuid = uniModule.uuid;
                 response.modules[module].title = uniModule.title;
                 response.modules[module].shortTitle = uniModule.shortTitle;
@@ -249,8 +249,25 @@ function parse(file) {
                 response.modules[module].comment = uniModule.comment;
                 response.modules[module].file = uniModule.file;
                 response.modules[module].specialities = uniModule.specialities;
-            }
 
+                for (var d = 0; d < response.modules[module].disciplines.length; d++) {
+                    let uniDiscipline = uniModule.disciplines.find(function(element) {
+                        if (response.modules[module].disciplines[d].disciplineNumberheaderCell.indexOf("______") >= 0) {
+                            if (element.number != null) {
+                                return element.number == parseInt(response.modules[module].disciplines[d].disciplineNumberheaderCell);
+                            } else {
+                                return response.modules[module].disciplines[d].titleheaderCell.indexOf(element.title) != -1
+                            }
+                        }
+                    });
+                    if (uniDiscipline != undefined) {
+                        response.modules[module].disciplines[d].uuid = uniDiscipline.uuid;
+                        response.modules[module].disciplines[d].title = uniDiscipline.title
+                        response.modules[module].disciplines[d].section = uniDiscipline.section
+                        response.modules[module].disciplines[d].file = uniDiscipline.file
+                    }
+                } // Здесь обновили дисчиплины
+            };
         }
 
         delete response.disciplines;
