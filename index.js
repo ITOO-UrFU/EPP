@@ -35,15 +35,13 @@ function Main() {
     };
 
     function worker() {
-        if (fs.existsSync(resultDir) == false) {
-            fs.mkdir(resultDir);
-        };
-        if (fs.existsSync(dumpDir) == false) {
-            fs.mkdir(dumpDir);
-        };
-        if (fs.existsSync(doneDir) == false) {
-            fs.mkdir(doneDir);
-        };
+        let dirs = [dataDir, doneDir, dumpDir, uniData, resultDir]
+        for (dir in dirs) {
+            if (fs.existsSync(dirs[dir]) == false) {
+                fs.mkdir(dirs[dir]);
+            };
+        }
+
         if (fs.existsSync(dataDir)) {
             fs.readdir(dataDir, (err, files) => {
                 if (files != undefined) {
