@@ -8,6 +8,8 @@ const crypto = require('crypto');
 const alasql = require('alasql');
 const tableToCsv = require('node-table-to-csv');
 
+const uniModules = require('./uni_data/modules');
+
 const dataDir = "./data";
 const resultDir = "./result";
 const doneDir = "./done";
@@ -230,16 +232,39 @@ function parse(file) {
                 }
             }
             response.modules[module]["disciplines"] = disciplines;
+
+            //Ого, всё сложили в респонс. Можно из юни подтянуть их модули и добавить поля к нашим
+            let uniModule = uniModules.find(function(element, num) {
+                    return element.number == parseInt(response.modules[module].disciplineNumberheaderCell);
+                }) // response.modules[module].disciplineNumberheaderCell);
+            if (uniModule != undefined) {
+                response.modules[module].uuid = uniModule.uuid;
+                response.modules[module].title = uniModule.title;
+                response.modules[module].shortTitle = uniModule.shortTitle;
+                response.modules[module].coordinator = uniModule.coordinator;
+                response.modules[module].type = uniModule.type;
+                response.modules[module].testUnits = uniModule.testUnits;
+                response.modules[module].priority = uniModule.priority;
+                response.modules[module].state = uniModule.state;
+                response.modules[module].comment = uniModule.comment;
+                response.modules[module].file = uniModule.file;
+                response.modules[module].specialities = uniModule.specialities;
+            }
+
         }
 
         delete response.disciplines;
 
-        //На всякий случай дампаем базу в файл
-        var tableIds = tables.map(function(tableObj) {
-            return tableObj["tableid"];
-        });
-        for (let i = 0; i < tableIds.length; i++) {
-            var sqlDump = alasql('SELECT * INTO JSON(?) FROM ' + tableIds[i], [path.join(dumpDir, tableIds[i] + ".sql")]);
+        //На всякий случай лениво дампаем базу в файл. Трюкач
+        try {
+            var tableIds = tables.map(function(tableObj) {
+                return tableObj["tableid"];
+            });
+            for (let i = 0; i < tableIds.length; i++) {
+                var sqlDump = alasql('SELECT * INTO JSON(?) FROM ' + tableIds[i], [path.join(dumpDir, tableIds[i] + ".sql")]);
+            }
+        } catch (e) {
+            console.log(e);
         }
 
         //Пишем рабочий json, который потом отправим на сервер
