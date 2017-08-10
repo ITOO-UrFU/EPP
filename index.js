@@ -10,6 +10,7 @@ const tableToCsv = require('node-table-to-csv');
 
 const uniModules = require('./uni_data/modules');
 
+
 const dataDir = "./data";
 const resultDir = "./result";
 const doneDir = "./done";
@@ -38,6 +39,13 @@ function Main() {
 
     function worker() {
         let dirs = [dataDir, doneDir, dumpDir, uniData, resultDir]
+
+        fs.stat('./uni_data/modules', function(err, stat) {
+            if (err == null) {
+                const uniModules = require('./uni_data/modules');
+            };
+        });
+
         for (dir in dirs) {
             if (fs.existsSync(dirs[dir]) == false) {
                 fs.mkdir(dirs[dir]);
@@ -136,6 +144,9 @@ function parse(file) {
             disciplines = response.disciplines.filter(function(item) {
                 return item.indexheaderCell.indexOf(moduleIndex) !== -1
             });
+            let newDisciplines = []
+            let forDelete = []
+
 
             //Пытаемся разбить дисциплины на части.
             // Примем за правило, что если дисциплина изучается несколько семестров,
@@ -143,7 +154,9 @@ function parse(file) {
 
             // Сперва найдём "большие" дисциплины, которые надо разделить
 
-            for (i in disciplines) {
+
+            for (var i = 0; i < disciplines.length; i++) {
+
                 let discipline = disciplines[i];
 
                 //Ищем экзамены и парсим
@@ -181,8 +194,21 @@ function parse(file) {
                         }
                     }
                 }
+                //Добавляем зачет и экзамен к тонким дисциплинам
+                if (exam.length == 1 && credit.length == 1) {
+                    disciplines[i].exam = exam[0]
+                    disciplines[i].credit = credit[0]
+                }
+
+
+                // console.log("    ", discipline.titleheaderCell, semesters.length)
                 if (semesters.length > 1 && discipline.indexheaderCell.indexOf("М.") == -1 &&
                     response.modules[module].titleheaderCell.toLowerCase().indexOf("практик") === -1) { // Большая дисциплина
+                    forDelete.push(i)
+                    if (response.modules[module].titleheaderCell.indexOf("Научно") == 0) {
+
+                        console.log(disciplines[i].titleheaderCell, forDelete)
+                    }
                     for (var s = 0; s < semesters.length; s++) {
                         var currentCredit = 0;
                         var currentExam = 0;
@@ -197,9 +223,8 @@ function parse(file) {
                         if (exam.indexOf(parseInt(semesters[s])) >= 0) {
                             currentExam = parseInt(semesters[s])
                         }
-
                         // Затем наклонируем их с убиранием ненужных семестров и срезанием нагрузки
-                        disciplines.push({
+                        newDisciplines.push({
                             "titleheaderCell": discipline.titleheaderCell + " " + romanDigits[s],
                             "indexheaderCell": discipline.indexheaderCell + "." + semesters[s],
                             "orderheaderCell": discipline.orderheaderCell,
@@ -212,10 +237,21 @@ function parse(file) {
 
                         })
                     }
-                    //Удаляем толстую дисциплину из респонса
+
+
+                }
+
+            }
+            //Удаляем толстую дисциплину из респонса
+            if (disciplines.length == forDelete.length) {
+                disciplines = []
+            } else {
+                for (let i = 0; i < forDelete.length; i++) {
                     disciplines.splice(i, 1)
                 }
             }
+            disciplines = disciplines.concat(newDisciplines)
+
             //Ищем первый семестр дисциплины
             for (let i = 0; i < disciplines.length; i++) {
                 keys = Object.keys(disciplines[i]).filter(function(key) {
