@@ -204,11 +204,8 @@ function parse(file) {
                 // console.log("    ", discipline.titleheaderCell, semesters.length)
                 if (semesters.length > 1 && discipline.indexheaderCell.indexOf("М.") == -1 &&
                     response.modules[module].titleheaderCell.toLowerCase().indexOf("практик") === -1) { // Большая дисциплина
-                    forDelete.push(i)
-                    if (response.modules[module].titleheaderCell.indexOf("Научно") == 0) {
-
-                        console.log(disciplines[i].titleheaderCell, forDelete)
-                    }
+                    forDelete.push(disciplines[i])
+                    if (response.modules[module].titleheaderCell.indexOf("Научно") == 0) {}
                     for (var s = 0; s < semesters.length; s++) {
                         var currentCredit = 0;
                         var currentExam = 0;
@@ -243,11 +240,15 @@ function parse(file) {
 
             }
             //Удаляем толстую дисциплину из респонса
+            // for (var d = 0; d < forDelete.length; d++) {
+            //     console.log(forDelete)
+            // }
             if (disciplines.length == forDelete.length) {
                 disciplines = []
             } else {
                 for (let i = 0; i < forDelete.length; i++) {
-                    disciplines.splice(i, 1)
+                    console.log(forDelete[i].titleheaderCell)
+                    disciplines.splice(disciplines.indexOf(forDelete[i]), 1)
                 }
             }
             disciplines = disciplines.concat(newDisciplines)
@@ -265,6 +266,10 @@ function parse(file) {
                         disciplines[i]["firstSemester"] = sem;
                     }
 
+                }
+                if (disciplines[i]["firstSemester"] == 99) {
+                    disciplines[i].exam = null
+                    disciplines[i].credit = null
                 }
             }
             response.modules[module]["disciplines"] = disciplines;
@@ -297,7 +302,8 @@ function parse(file) {
                         }
                     });
                     if (uniDiscipline != undefined) {
-                        response.modules[module].disciplines[d].uuid = uniDiscipline.uuid;
+                        response.modules[module].disciplines[d].uuid = uniDiscipline.uid;
+                        response.modules[module].disciplines[d].discipline = uniDiscipline.discipline;
                         response.modules[module].disciplines[d].title = uniDiscipline.title
                         response.modules[module].disciplines[d].section = uniDiscipline.section
                         response.modules[module].disciplines[d].file = uniDiscipline.file
