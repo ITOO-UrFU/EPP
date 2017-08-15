@@ -243,14 +243,16 @@ function parse(file) {
             // for (var d = 0; d < forDelete.length; d++) {
             //     console.log(forDelete)
             // }
-            if (disciplines.length == forDelete.length) {
-                disciplines = []
-            } else {
-                for (let i = 0; i < forDelete.length; i++) {
-                    console.log(forDelete[i].titleheaderCell)
-                    disciplines.splice(disciplines.indexOf(forDelete[i]), 1)
-                }
-            }
+
+            //Пока не удаляем дисциплины, удаляем руками в админке!
+            // if (disciplines.length == forDelete.length) {
+            //     disciplines = []
+            // } else {
+            //     for (let i = 0; i < forDelete.length; i++) {
+            //         console.log(forDelete[i].titleheaderCell)
+            //         disciplines.splice(disciplines.indexOf(forDelete[i]), 1)
+            //     }
+            // }
             disciplines = disciplines.concat(newDisciplines)
 
             //Ищем первый семестр дисциплины
